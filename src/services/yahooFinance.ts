@@ -1,4 +1,7 @@
-import yahooFinance from 'yahoo-finance2';
+import YahooFinance from 'yahoo-finance2';
+
+// v3: the default export is a class; create one shared client instance
+const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 
 /**
  * Wraps yahoo-finance2 calls to provide strongly-typed helpers.

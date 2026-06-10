@@ -1,26 +1,8 @@
 import WebSocket, { WebSocketServer } from 'ws';
 import http from 'http';
-import yahooFinance from 'yahoo-finance2';
 import { getQuotes } from './src/services/yahooFinance';
 
 const PORT = process.env.WS_PORT ? Number(process.env.WS_PORT) : 4000;
-
-// Initialize the yahoo-finance2 library.
-// This is crucial because the library needs to fetch cookies and a crumb
-// to communicate with Yahoo's API, and this can fail occasionally.
-// By doing it once on startup, we make the server more robust.
-async function initializeYahooFinance() {
-  try {
-    console.log('Initializing yahoo-finance2...');
-    // We use a common, liquid stock like AAPL for a reliable initialization check.
-    await yahooFinance.quote('AAPL');
-    console.log('yahoo-finance2 initialized successfully.');
-  } catch (error) {
-    console.error('Fatal: Failed to initialize yahoo-finance2. The server will exit.', error);
-    // If we can't initialize, the server is useless, so we exit.
-    process.exit(1);
-  }
-}
 
 const server = http.createServer();
 const wss = new WebSocketServer({ server });
@@ -97,20 +79,21 @@ async function fetchAndBroadcastAll() {
 
 // Main server startup sequence.
 async function main() {
-  await initializeYahooFinance();
-
-  // Do the initial fetch and wait for it to complete before starting the server.
-  // This ensures the cache is populated for the first client that connects.
-  console.log('Performing initial data fetch...');
-  await fetchAndBroadcastAll();
-  console.log('Initial data fetch complete. Cache is populated.');
-
-  // Now, start the recurring fetch loop.
-  setInterval(fetchAndBroadcastAll, 60000);
-
+  // Start listening immediately so clients can connect while we fetch data.
   server.listen(PORT, () => {
     console.log(`WebSocket server listening on ws://localhost:${PORT}`);
   });
+
+  // Attempt initial fetch; on rate-limit or transient failure, retry after 60 s.
+  console.log('Performing initial data fetch...');
+  try {
+    await fetchAndBroadcastAll();
+    console.log('Initial data fetch complete. Cache is populated.');
+  } catch (error) {
+    console.warn('Initial fetch failed, will retry in 60 s:', (error as Error).message);
+  }
+
+  setInterval(fetchAndBroadcastAll, 60000);
 }
 
 main();

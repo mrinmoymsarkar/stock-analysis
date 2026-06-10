@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     // Filter results to only include Indian equities from NSE (.NS) and BSE (.BO)
     const indianResults = results.quotes.filter((quote) => {
       // Type guard to ensure we are only dealing with stock quotes
-      if ('symbol' in quote && 'quoteType' in quote) {
+      if ('symbol' in quote && 'quoteType' in quote && typeof quote.symbol === 'string') {
         return (
           quote.quoteType === 'EQUITY' &&
           (quote.symbol.endsWith('.NS') || quote.symbol.endsWith('.BO'))
