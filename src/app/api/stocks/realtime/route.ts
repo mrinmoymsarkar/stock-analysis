@@ -15,7 +15,7 @@ const symbols = [
 
 // Module-level cache so concurrent visitors share one Yahoo fetch per TTL
 // window (persists for the lifetime of a warm serverless instance).
-const CACHE_TTL_MS = 30_000;
+const CACHE_TTL_MS = 60_000;
 let cache: { stocks: Record<string, StockData>; timestamp: number } | null = null;
 let inFlight: Promise<Record<string, StockData>> | null = null;
 
