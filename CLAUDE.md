@@ -4,15 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-An Indian stock market dashboard (NSE/BSE stocks, Nifty 50, Sensex) built with Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS, and Recharts. Data comes from Yahoo Finance via the `yahoo-finance2` library.
+An Indian stock market dashboard (NSE/BSE stocks, Nifty 50, Sensex) built with Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS, and Recharts. Data comes from Yahoo Finance via the `yahoo-finance2` library.
 
 ## Commands
 
 ```bash
-npm run dev      # Next.js dev server with Turbopack (http://localhost:3000)
+npm run dev      # Next.js dev server (Turbopack is the default in 16) (http://localhost:3000)
 npm run ws       # Standalone WebSocket server on ws://localhost:4000 (real-time data; optional)
 npm run build    # Production build
-npm run lint     # ESLint (next lint)
+npm run lint     # ESLint (eslint .)
 npm test         # Run all Jest tests
 npx jest src/hooks/__tests__/useWebSocket.test.ts          # Run a single test file
 npx jest -t "test name"                                     # Run tests matching a name
