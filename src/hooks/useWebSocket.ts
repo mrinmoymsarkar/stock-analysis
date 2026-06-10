@@ -15,6 +15,7 @@ export default function useWebSocket(url: string, {
   const ws = useRef<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   // Memoize the callback to ensure it's stable and doesn't cause re-renders.
@@ -23,10 +24,12 @@ export default function useWebSocket(url: string, {
   // Polling function for fallback
   const startPolling = useCallback(async () => {
     if (!fallbackToPolling) return;
-    
+    // Already polling (onerror and onclose can both fire) — don't start a second interval
+    if (pollingRef.current) return;
+
     setIsPolling(true);
     console.log('Starting polling fallback...');
-    
+
     const poll = async () => {
       try {
         // Fetch data from API instead of WebSocket
@@ -34,6 +37,7 @@ export default function useWebSocket(url: string, {
         if (response.ok) {
           const data = await response.json();
           if (data.stocks) {
+            setError(null);
             Object.entries(data.stocks).forEach(([symbol, stockData]: [string, any]) => {
               memoizedOnMessage({
                 symbol,
@@ -42,17 +46,22 @@ export default function useWebSocket(url: string, {
               });
             });
           }
+        } else {
+          const body = await response.json().catch(() => null);
+          setError(body?.error || `Data API returned ${response.status}`);
         }
       } catch (error) {
         console.error('Polling error:', error);
+        setError('Unable to reach the data API');
       }
     };
 
+    // Set up the interval before the initial (async) poll so a re-entrant
+    // call sees pollingRef and bails instead of starting a second interval
+    pollingRef.current = setInterval(poll, pollingInterval);
+
     // Initial poll
     await poll();
-    
-    // Set up interval
-    pollingRef.current = setInterval(poll, pollingInterval);
   }, [fallbackToPolling, pollingInterval, memoizedOnMessage]);
 
   const stopPolling = useCallback(() => {
@@ -78,8 +87,7 @@ export default function useWebSocket(url: string, {
           startPolling();
         }
       };
-      ws.current.onerror = (error) => {
-        console.error('WebSocket error:', error);
+      ws.current.onerror = () => {
         setConnected(false);
         // Start polling if WebSocket fails and fallback is enabled
         if (fallbackToPolling) {
@@ -110,5 +118,5 @@ export default function useWebSocket(url: string, {
     };
   }, [url, memoizedOnMessage, fallbackToPolling, startPolling, stopPolling]);
 
-  return { connected: connected || isPolling, isPolling };
+  return { connected: connected || isPolling, isPolling, error };
 }

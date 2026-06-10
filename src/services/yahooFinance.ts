@@ -7,6 +7,12 @@ export async function getQuote(symbol: string) {
   return yahooFinance.quote(symbol);
 }
 
+// Fetches all symbols in a single Yahoo request — far less likely to be
+// rate-limited than one request per symbol.
+export async function getQuotes(symbols: string[]) {
+  return yahooFinance.quote(symbols);
+}
+
 export async function getHistorical(symbol: string, range: string = '1mo') {
   const period2 = new Date();
   const period1 = new Date();

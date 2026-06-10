@@ -1,7 +1,7 @@
 import WebSocket, { WebSocketServer } from 'ws';
 import http from 'http';
 import yahooFinance from 'yahoo-finance2';
-import { getQuote } from './src/services/yahooFinance';
+import { getQuotes } from './src/services/yahooFinance';
 
 const PORT = process.env.WS_PORT ? Number(process.env.WS_PORT) : 4000;
 
@@ -62,43 +62,33 @@ const symbols = [
   '^BSESN' // Sensex
 ];
 
-// Fetches quotes for all symbols and broadcasts them in parallel.
+// Fetches quotes for all symbols in a single batched request and broadcasts them.
 async function fetchAndBroadcastAll() {
-  console.log("Starting new parallel fetch cycle for all symbols...");
+  console.log("Starting new batched fetch cycle for all symbols...");
 
-  const promises = symbols.map(async (symbol) => {
-    try {
-      const quote = await getQuote(symbol);
-      // The 'as const' is important for TypeScript to infer a literal type
-      return { symbol, quote, status: 'fulfilled' as const };
-    } catch (error) {
-      return { symbol, error, status: 'rejected' as const };
-    }
-  });
+  let quotes;
+  try {
+    quotes = await getQuotes(symbols);
+  } catch (error) {
+    console.error('Failed to fetch batched quotes:', error);
+    return;
+  }
 
-  const results = await Promise.all(promises);
-
-  results.forEach(result => {
-    if (result.status === 'fulfilled') {
-      const { quote } = result;
-      if (quote && quote.regularMarketPrice) {
-        const message = {
-          symbol: result.symbol,
-          data: {
-            regularMarketPrice: quote.regularMarketPrice,
-            regularMarketChangePercent: quote.regularMarketChangePercent,
-          },
-          ts: Date.now(),
-        };
-        latestDataCache.set(result.symbol, message); // Update cache
-        broadcast(message);
-        console.log(`Broadcasted data for ${result.symbol}`);
-      } else {
-        console.warn(`No valid data returned for ${result.symbol}`);
-      }
-    } else { // status === 'rejected'
-      const { error } = result;
-      console.error(`Failed to fetch quote for ${result.symbol}:`, error);
+  quotes.forEach((quote) => {
+    if (quote && typeof quote.regularMarketPrice === 'number') {
+      const message = {
+        symbol: quote.symbol,
+        data: {
+          regularMarketPrice: quote.regularMarketPrice,
+          regularMarketChangePercent: quote.regularMarketChangePercent,
+        },
+        ts: Date.now(),
+      };
+      latestDataCache.set(quote.symbol, message); // Update cache
+      broadcast(message);
+      console.log(`Broadcasted data for ${quote.symbol}`);
+    } else {
+      console.warn(`No valid data returned for ${quote?.symbol ?? 'unknown symbol'}`);
     }
   });
 

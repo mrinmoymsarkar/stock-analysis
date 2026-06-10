@@ -34,7 +34,7 @@ export default function Home() {
 
   // Connect to the WebSocket server and provide the callback
   // Use polling fallback for Vercel deployment
-  const { connected, isPolling } = useWebSocket('ws://localhost:4000', { 
+  const { connected, isPolling, error: dataError } = useWebSocket('ws://localhost:4000', {
     onMessage: handleMessage,
     fallbackToPolling: true,
     pollingInterval: 30000 // 30 seconds
@@ -91,6 +91,10 @@ export default function Home() {
                   onClick={setActiveSymbol}
                 />
               ))
+            ) : dataError ? (
+              <p className="col-span-full text-center text-red-500 py-10">
+                Market data unavailable: {dataError}. Retrying automatically...
+              </p>
             ) : (
               <p className="col-span-full text-center text-muted-foreground py-10">Waiting for market data...</p>
             )}
