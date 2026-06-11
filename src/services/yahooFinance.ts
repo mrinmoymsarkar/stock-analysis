@@ -72,3 +72,46 @@ export async function getSummary(symbol: string) {
 export async function search(query: string) {
   return yahooFinance.search(query);
 }
+
+export async function getDetail(symbol: string) {
+  try {
+    const quoteResult = await yahooFinance.quote(symbol);
+    const quoteType: string = (quoteResult as { quoteType?: string }).quoteType ?? 'EQUITY';
+
+    let modules: string[];
+    switch (quoteType) {
+      case 'MUTUALFUND':
+        modules = ['price', 'summaryDetail', 'fundProfile', 'fundPerformance', 'topHoldings'];
+        break;
+      case 'INDEX':
+        modules = ['price', 'summaryDetail'];
+        break;
+      case 'EQUITY':
+      default:
+        modules = ['price', 'summaryDetail', 'defaultKeyStatistics', 'financialData', 'recommendationTrend'];
+        break;
+    }
+
+    let summary: Record<string, unknown> = {};
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      summary = (await yahooFinance.quoteSummary(symbol, { modules: modules as any })) as Record<string, unknown>;
+    } catch {
+      // Partial data: return whatever quote we have
+    }
+
+    return { quoteType, quote: quoteResult, summary };
+  } catch (error) {
+    console.error(`getDetail error for ${symbol}:`, error);
+    return { quoteType: 'EQUITY', quote: null, summary: {} };
+  }
+}
+
+export async function getNews(query: string, count = 10) {
+  try {
+    const result = await yahooFinance.search(query, { newsCount: count, quotesCount: 0 });
+    return result.news ?? [];
+  } catch {
+    return [];
+  }
+}
