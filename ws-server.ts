@@ -1,6 +1,7 @@
 import WebSocket, { WebSocketServer } from 'ws';
 import http from 'http';
 import { getQuotes } from './src/services/yahooFinance';
+import { DEFAULT_SYMBOLS } from './src/lib/watchlist';
 
 const PORT = process.env.WS_PORT ? Number(process.env.WS_PORT) : 4000;
 
@@ -11,7 +12,6 @@ const latestDataCache: Map<string, unknown> = new Map();
 wss.on('connection', (ws) => {
   console.log('Client connected');
 
-  // Send the cached data to the newly connected client
   if (latestDataCache.size > 0) {
     console.log('Sending cached data to new client...');
     latestDataCache.forEach((data) => {
@@ -23,7 +23,6 @@ wss.on('connection', (ws) => {
   ws.on('close', () => console.log('Client disconnected'));
 });
 
-// Broadcasts data to all connected clients.
 function broadcast(data: unknown) {
   const json = JSON.stringify(data);
   wss.clients.forEach((client) => {
@@ -33,24 +32,12 @@ function broadcast(data: unknown) {
   });
 }
 
-// List of key Indian stocks and indices to track.
-const symbols = [
-  'TCS.NS', 'INFY.NS', 'WIPRO.NS', 'HCLTECH.NS',
-  'HDFCBANK.NS', 'ICICIBANK.NS', 'SBIN.NS', 'KOTAKBANK.NS',
-  'RELIANCE.NS', 'ONGC.NS', 'NTPC.NS',
-  'ITC.NS', 'HINDUNILVR.NS', 'NESTLEIND.NS',
-  'SUNPHARMA.NS', 'DRREDDY.NS', 'CIPLA.NS',
-  '^NSEI', // Nifty 50
-  '^BSESN' // Sensex
-];
-
-// Fetches quotes for all symbols in a single batched request and broadcasts them.
 async function fetchAndBroadcastAll() {
   console.log("Starting new batched fetch cycle for all symbols...");
 
   let quotes;
   try {
-    quotes = await getQuotes(symbols);
+    quotes = await getQuotes(DEFAULT_SYMBOLS);
   } catch (error) {
     console.error('Failed to fetch batched quotes:', error);
     return;
@@ -66,7 +53,7 @@ async function fetchAndBroadcastAll() {
         },
         ts: Date.now(),
       };
-      latestDataCache.set(quote.symbol, message); // Update cache
+      latestDataCache.set(quote.symbol, message);
       broadcast(message);
       console.log(`Broadcasted data for ${quote.symbol}`);
     } else {
@@ -77,14 +64,11 @@ async function fetchAndBroadcastAll() {
   console.log("Fetch cycle complete.");
 }
 
-// Main server startup sequence.
 async function main() {
-  // Start listening immediately so clients can connect while we fetch data.
   server.listen(PORT, () => {
     console.log(`WebSocket server listening on ws://localhost:${PORT}`);
   });
 
-  // Attempt initial fetch; on rate-limit or transient failure, retry after 60 s.
   console.log('Performing initial data fetch...');
   try {
     await fetchAndBroadcastAll();
@@ -97,4 +81,3 @@ async function main() {
 }
 
 main();
-

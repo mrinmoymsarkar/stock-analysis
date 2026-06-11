@@ -1,16 +1,20 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { WSMessage } from '@/types';
+import { DEFAULT_SYMBOLS } from '@/lib/watchlist';
+import { symbolsKey } from '@/lib/symbols';
 
 interface UseWebSocketOptions {
   onMessage: (message: WSMessage) => void;
   fallbackToPolling?: boolean;
   pollingInterval?: number;
+  symbols?: string[];
 }
 
-export default function useWebSocket(url: string, { 
-  onMessage, 
-  fallbackToPolling = true, 
-  pollingInterval = 30000 
+export default function useWebSocket(url: string, {
+  onMessage,
+  fallbackToPolling = true,
+  pollingInterval = 30000,
+  symbols,
 }: UseWebSocketOptions) {
   const ws = useRef<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
@@ -18,51 +22,31 @@ export default function useWebSocket(url: string, {
   const [error, setError] = useState<string | null>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Memoize the callback to ensure it's stable and doesn't cause re-renders.
+  // Stable callback identity — frozen on purpose (existing contract)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const memoizedOnMessage = useCallback(onMessage, []);
 
-  // Polling function for fallback
-  const startPolling = useCallback(async () => {
-    if (!fallbackToPolling) return;
-    // Already polling (onerror and onclose can both fire) — don't start a second interval
-    if (pollingRef.current) return;
+  // Whether to skip WebSocket and poll directly (custom symbol set)
+  const useCustomSymbols =
+    symbols !== undefined &&
+    symbolsKey(symbols) !== symbolsKey(DEFAULT_SYMBOLS);
 
-    setIsPolling(true);
-    console.log('Starting polling fallback...');
+  // Keep latest symbols in a ref so the polling closure reads the current set
+  // without needing to be re-created. Updated inside an effect to satisfy lint.
+  const symbolsRef = useRef<string[] | undefined>(symbols);
+  useEffect(() => {
+    symbolsRef.current = symbols;
+  }, [symbols]);
 
-    const poll = async () => {
-      try {
-        // Fetch data from API instead of WebSocket
-        const response = await fetch('/api/stocks/realtime');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.stocks) {
-            setError(null);
-            Object.entries(data.stocks).forEach(([symbol, stockData]: [string, any]) => {
-              memoizedOnMessage({
-                symbol,
-                data: stockData,
-                ts: Date.now()
-              });
-            });
-          }
-        } else {
-          const body = await response.json().catch(() => null);
-          setError(body?.error || `Data API returned ${response.status}`);
-        }
-      } catch (error) {
-        console.error('Polling error:', error);
-        setError('Unable to reach the data API');
-      }
-    };
-
-    // Set up the interval before the initial (async) poll so a re-entrant
-    // call sees pollingRef and bails instead of starting a second interval
-    pollingRef.current = setInterval(poll, pollingInterval);
-
-    // Initial poll
-    await poll();
-  }, [fallbackToPolling, pollingInterval, memoizedOnMessage]);
+  const buildPollingUrl = useCallback(() => {
+    const syms = symbolsRef.current;
+    const isCustom =
+      syms !== undefined && symbolsKey(syms) !== symbolsKey(DEFAULT_SYMBOLS);
+    if (isCustom && syms) {
+      return `/api/stocks/realtime?symbols=${encodeURIComponent(syms.join(','))}`;
+    }
+    return '/api/stocks/realtime';
+  }, []);
 
   const stopPolling = useCallback(() => {
     if (pollingRef.current) {
@@ -72,29 +56,92 @@ export default function useWebSocket(url: string, {
     setIsPolling(false);
   }, []);
 
+  const startPolling = useCallback(async (immediate = false) => {
+    if (!fallbackToPolling) return;
+    if (pollingRef.current) {
+      if (immediate) {
+        try {
+          const response = await fetch(buildPollingUrl());
+          if (response.ok) {
+            const data = await response.json();
+            if (data.stocks) {
+              setError(null);
+              Object.entries(data.stocks).forEach(([symbol, stockData]) => {
+                memoizedOnMessage({ symbol, data: stockData as WSMessage['data'], ts: Date.now() });
+              });
+            }
+          }
+        } catch { /* swallowed; handled in main poll */ }
+      }
+      return;
+    }
+
+    setIsPolling(true);
+
+    const poll = async () => {
+      try {
+        const response = await fetch(buildPollingUrl());
+        if (response.ok) {
+          const data = await response.json();
+          if (data.stocks) {
+            setError(null);
+            Object.entries(data.stocks).forEach(([symbol, stockData]) => {
+              memoizedOnMessage({ symbol, data: stockData as WSMessage['data'], ts: Date.now() });
+            });
+          }
+        } else {
+          const body = await response.json().catch(() => null);
+          setError(body?.error || `Data API returned ${response.status}`);
+        }
+      } catch (err) {
+        console.error('Polling error:', err);
+        setError('Unable to reach the data API');
+      }
+    };
+
+    pollingRef.current = setInterval(poll, pollingInterval);
+    await poll();
+  }, [fallbackToPolling, pollingInterval, memoizedOnMessage, buildPollingUrl]);
+
+  // Restart polling when the symbol set changes (only while already polling)
+  const prevSymbolsKeyRef = useRef<string | null>(null);
+  const currentSymbolsKey = symbols !== undefined ? symbolsKey(symbols) : null;
+
   useEffect(() => {
-    // Try WebSocket first
+    const keyChanged =
+      currentSymbolsKey !== null &&
+      prevSymbolsKeyRef.current !== null &&
+      prevSymbolsKeyRef.current !== currentSymbolsKey;
+    prevSymbolsKeyRef.current = currentSymbolsKey;
+
+    if (keyChanged && pollingRef.current) {
+      stopPolling();
+      startPolling(true);
+    }
+  }, [currentSymbolsKey, stopPolling, startPolling]);
+
+  useEffect(() => {
+    if (useCustomSymbols) {
+      // Skip WebSocket entirely for custom symbol sets
+      startPolling(true);
+      return () => stopPolling();
+    }
+
+    // Default path: try WebSocket first, fall back to polling
     try {
       ws.current = new WebSocket(url);
       ws.current.onopen = () => {
         setConnected(true);
-        stopPolling(); // Stop polling if WebSocket connects
+        stopPolling();
       };
       ws.current.onclose = () => {
         setConnected(false);
-        // Start polling if WebSocket fails and fallback is enabled
-        if (fallbackToPolling) {
-          startPolling();
-        }
+        if (fallbackToPolling) startPolling();
       };
       ws.current.onerror = () => {
         setConnected(false);
-        // Start polling if WebSocket fails and fallback is enabled
-        if (fallbackToPolling) {
-          startPolling();
-        }
+        if (fallbackToPolling) startPolling();
       };
-
       ws.current.onmessage = (event) => {
         try {
           const json = JSON.parse(event.data);
@@ -103,20 +150,17 @@ export default function useWebSocket(url: string, {
           console.error('Failed to parse WebSocket message:', err);
         }
       };
-    } catch (error) {
-      console.error('Failed to create WebSocket connection:', error);
-      // Start polling if WebSocket creation fails
-      if (fallbackToPolling) {
-        startPolling();
-      }
+    } catch (err) {
+      console.error('Failed to create WebSocket connection:', err);
+      if (fallbackToPolling) startPolling();
     }
 
-    // Cleanup function to close the connection and stop polling
     return () => {
       ws.current?.close();
       stopPolling();
     };
-  }, [url, memoizedOnMessage, fallbackToPolling, startPolling, stopPolling]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url, useCustomSymbols]);
 
   return { connected: connected || isPolling, isPolling, error };
 }

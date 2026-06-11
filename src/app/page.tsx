@@ -1,120 +1,158 @@
 "use client";
 
 import { useCallback, useState } from 'react';
+import Link from 'next/link';
+import { ExternalLink } from 'lucide-react';
 import useWebSocket from '@/hooks/useWebSocket';
+import useWatchlist from '@/hooks/useWatchlist';
 import useHistoricalData from '@/hooks/useHistoricalData';
 import MarketOverviewCard from '@/components/cards/MarketOverviewCard';
+import AddToWatchlistButton from '@/components/cards/AddToWatchlistButton';
 import PriceChart from '@/components/charts/PriceChart';
 import TimeRangeSelector from '@/components/controls/TimeRangeSelector';
 import StockSearch from '@/components/controls/StockSearch';
-import { ThemeToggle } from '@/components/ThemeToggle';
 import { StockData, WSMessage } from '@/types';
 
 export default function Home() {
-  // State to hold the latest stock information for all symbols
+  const { symbols, add, remove, hydrated } = useWatchlist();
   const [stocks, setStocks] = useState<Record<string, StockData>>({});
-  // State to determine which stock's chart is displayed
   const [activeSymbol, setActiveSymbol] = useState<string>('');
 
-  // Define the callback for handling incoming WebSocket messages.
-  // We use useCallback to ensure this function has a stable identity.
   const handleMessage = useCallback((message: WSMessage) => {
     const { symbol, data } = message;
     if (symbol && data && typeof (data as StockData).regularMarketPrice === 'number') {
-      setStocks(prevStocks => ({
-        ...prevStocks,
-        [symbol]: data as StockData,
-      }));
-
-      // Set the first received symbol as the active one for the chart
-      // Use a functional update for setActiveSymbol to avoid dependency
-      setActiveSymbol(prevActive => prevActive || symbol);
+      setStocks(prev => ({ ...prev, [symbol]: data as StockData }));
+      setActiveSymbol(prev => prev || symbol);
     }
-  }, []); // Empty dependency array means this function is created once.
+  }, []);
 
-  // Connect to the WebSocket server and provide the callback
-  // Use polling fallback for Vercel deployment
   const { connected, isPolling, error: dataError } = useWebSocket('ws://localhost:4000', {
     onMessage: handleMessage,
     fallbackToPolling: true,
-    pollingInterval: 30000 // 30 seconds
+    pollingInterval: 30000,
+    symbols: hydrated ? symbols : undefined,
   });
-  
+
   const [range, setRange] = useState('1mo');
   const { data: chartData, loading: chartLoading, error: chartError } = useHistoricalData(activeSymbol, range);
 
-  // Determine connection status text and color
   const getConnectionStatus = () => {
-    if (connected && !isPolling) {
-      return { text: 'WebSocket Connected', color: 'text-green-600' };
-    } else if (connected && isPolling) {
-      return { text: 'Polling Mode', color: 'text-yellow-600' };
-    } else {
-      return { text: 'Disconnected', color: 'text-red-600' };
-    }
+    if (connected && !isPolling) return { text: 'WebSocket Connected', color: 'text-green-600' };
+    if (connected && isPolling) return { text: 'Polling Mode', color: 'text-yellow-600' };
+    return { text: 'Disconnected', color: 'text-red-600' };
   };
 
   const connectionStatus = getConnectionStatus();
 
+  const handleSymbolSelect = useCallback((symbol: string) => {
+    add(symbol);
+    setActiveSymbol(symbol);
+  }, [add]);
+
+  const handleRemove = useCallback((symbol: string) => {
+    remove(symbol);
+    setActiveSymbol(prev => (prev === symbol ? '' : prev));
+    setStocks(prev => {
+      const next = { ...prev };
+      delete next[symbol];
+      return next;
+    });
+  }, [remove]);
+
   return (
     <div className="bg-background min-h-screen text-foreground">
-      <header className="bg-card border-b border-border shadow-sm sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <h1 className="text-xl font-bold">
-              Indian Stock Market Dashboard
-            </h1>
-            <ThemeToggle />
+      <div className="bg-card border-b border-border">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-4">
+          <div className="flex-1 flex justify-start">
+            <StockSearch onSymbolSelect={handleSymbolSelect} />
           </div>
-          <div className="flex-1 flex justify-center px-8">
-            <StockSearch onSymbolSelect={setActiveSymbol} />
-          </div>
-          <div className="text-sm font-medium">
-            <span>Status: </span>
-            <span className={connectionStatus.color}>
-              {connectionStatus.text}
-            </span>
+          <div className="text-sm font-medium shrink-0">
+            <span className="text-muted-foreground">Status: </span>
+            <span className={connectionStatus.color}>{connectionStatus.text}</span>
           </div>
         </div>
-      </header>
-      
+      </div>
+
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col gap-8">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {Object.keys(stocks).length > 0 ? (
-              Object.entries(stocks).map(([symbol, stockData]) => (
-                <MarketOverviewCard
-                  key={symbol}
-                  symbol={symbol}
-                  price={stockData.regularMarketPrice}
-                  change={stockData.regularMarketChangePercent}
-                  onClick={setActiveSymbol}
-                />
+            {symbols.length > 0 ? (
+              symbols.map(symbol => (
+                <div key={symbol} className="relative group">
+                  <MarketOverviewCard
+                    symbol={symbol}
+                    price={stocks[symbol]?.regularMarketPrice}
+                    change={stocks[symbol]?.regularMarketChangePercent}
+                    onClick={setActiveSymbol}
+                    onRemove={() => handleRemove(symbol)}
+                  />
+                  <Link
+                    href={`/stock/${encodeURIComponent(symbol)}`}
+                    className="absolute bottom-1 right-6 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-muted-foreground hover:text-foreground"
+                    title={`View ${symbol} details`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <ExternalLink size={12} />
+                  </Link>
+                </div>
               ))
             ) : dataError ? (
               <p className="col-span-full text-center text-red-500 py-10">
                 Market data unavailable: {dataError}. Retrying automatically...
               </p>
             ) : (
-              <p className="col-span-full text-center text-muted-foreground py-10">Waiting for market data...</p>
+              <div className="col-span-full text-center py-10">
+                <p className="text-muted-foreground mb-2">Your watchlist is empty.</p>
+                <p className="text-sm text-muted-foreground">Use the search bar above to add stocks.</p>
+              </div>
             )}
           </div>
 
-          <h2 className="text-2xl font-semibold self-start mt-4">
-            {activeSymbol ? `Chart: ${activeSymbol}` : 'Chart'}
-          </h2>
+          <div className="flex items-center justify-between mt-4">
+            <h2 className="text-2xl font-semibold">
+              {activeSymbol ? `Chart: ${activeSymbol}` : 'Chart'}
+            </h2>
+            <div className="flex items-center gap-2">
+              {activeSymbol && (
+                <>
+                  <Link
+                    href={`/stock/${encodeURIComponent(activeSymbol)}`}
+                    className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                  >
+                    View details
+                    <ExternalLink size={13} />
+                  </Link>
+                  <AddToWatchlistButton
+                    symbol={activeSymbol}
+                    inWatchlist={symbols.includes(activeSymbol)}
+                    onAdd={add}
+                  />
+                </>
+              )}
+            </div>
+          </div>
 
           <div className="w-full bg-card p-4 rounded-lg shadow">
             <div className="flex justify-end mb-4">
               <TimeRangeSelector selectedRange={range} onSelectRange={setRange} />
             </div>
-            {chartLoading && <div className="h-[350px] flex items-center justify-center"><p>Loading chart...</p></div>}
-            {chartError && <div className="h-[350px] flex items-center justify-center"><p className="text-red-500">{chartError}</p></div>}
+            {chartLoading && (
+              <div className="h-[350px] flex items-center justify-center">
+                <p>Loading chart...</p>
+              </div>
+            )}
+            {chartError && (
+              <div className="h-[350px] flex items-center justify-center">
+                <p className="text-red-500">{chartError}</p>
+              </div>
+            )}
             {!chartLoading && !chartError && chartData.length > 0 && (
               <PriceChart data={chartData} />
             )}
             {!activeSymbol && !chartLoading && (
-              <div className="h-[350px] flex items-center justify-center"><p className="text-muted-foreground">Search for a stock or select one from above to see its chart.</p></div>
+              <div className="h-[350px] flex items-center justify-center">
+                <p className="text-muted-foreground">Search for a stock or select one from above to see its chart.</p>
+              </div>
             )}
           </div>
         </div>
@@ -122,4 +160,3 @@ export default function Home() {
     </div>
   );
 }
-

@@ -11,7 +11,6 @@ describe('StockSearch', () => {
   const mockOnSymbolSelect = jest.fn();
 
   beforeEach(() => {
-    // Clear all mocks before each test
     (global.fetch as jest.Mock).mockClear();
     mockOnSymbolSelect.mockClear();
   });
@@ -23,7 +22,7 @@ describe('StockSearch', () => {
 
   it('fetches and displays search results when user types a query', async () => {
     const mockResults = {
-      data: [{ symbol: 'RELIANCE.NS', longname: 'Reliance Industries' }],
+      data: [{ symbol: 'RELIANCE.NS', longname: 'Reliance Industries', exchange: 'NSI', quoteType: 'EQUITY' }],
     };
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       json: jest.fn().mockResolvedValueOnce(mockResults),
@@ -34,12 +33,26 @@ describe('StockSearch', () => {
 
     fireEvent.change(input, { target: { value: 'RELIANCE' } });
 
-    // Check that fetch was called
     expect(global.fetch).toHaveBeenCalledWith('/api/search?q=RELIANCE');
 
-    // Wait for results to appear
     expect(await screen.findByText('Reliance Industries')).toBeInTheDocument();
     expect(screen.getByText('RELIANCE.NS')).toBeInTheDocument();
+    // Type badge
+    expect(screen.getByText('Stock')).toBeInTheDocument();
+  });
+
+  it('shows Fund badge for mutual fund results', async () => {
+    const mockResults = {
+      data: [{ symbol: 'HDFC.NS', longname: 'HDFC Fund', exchange: 'NSI', quoteType: 'MUTUALFUND' }],
+    };
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      json: jest.fn().mockResolvedValueOnce(mockResults),
+    });
+
+    render(<StockSearch onSymbolSelect={mockOnSymbolSelect} />);
+    fireEvent.change(screen.getByPlaceholderText(/Search for a stock/i), { target: { value: 'HDFC' } });
+
+    expect(await screen.findByText('Fund')).toBeInTheDocument();
   });
 
   it('displays "No results found" for an empty response', async () => {
@@ -58,7 +71,7 @@ describe('StockSearch', () => {
 
   it('calls onSymbolSelect and closes dropdown when a result is clicked', async () => {
     const mockResults = {
-      data: [{ symbol: 'TCS.NS', longname: 'Tata Consultancy' }],
+      data: [{ symbol: 'TCS.NS', longname: 'Tata Consultancy', exchange: 'NSI', quoteType: 'EQUITY' }],
     };
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       json: jest.fn().mockResolvedValueOnce(mockResults),
@@ -68,15 +81,12 @@ describe('StockSearch', () => {
     const input = screen.getByPlaceholderText(/Search for a stock/i);
     fireEvent.change(input, { target: { value: 'TCS' } });
 
-    // Wait for the result and click it
     const resultItem = await screen.findByText('Tata Consultancy');
     fireEvent.click(resultItem);
 
-    // Check that the handler was called
     expect(mockOnSymbolSelect).toHaveBeenCalledWith('TCS.NS');
     expect(mockOnSymbolSelect).toHaveBeenCalledTimes(1);
 
-    // Check that the dropdown is closed (the result text is gone)
     await waitFor(() => {
       expect(screen.queryByText('Tata Consultancy')).not.toBeInTheDocument();
     });

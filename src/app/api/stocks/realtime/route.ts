@@ -1,84 +1,101 @@
 import { NextResponse } from 'next/server';
 import { getQuotes } from '@/services/yahooFinance';
 import { StockData } from '@/types';
+import { DEFAULT_SYMBOLS } from '@/lib/watchlist';
+import { sanitizeSymbols } from '@/lib/symbols';
 
-// List of key Indian stocks and indices to track
-const symbols = [
-  'TCS.NS', 'INFY.NS', 'WIPRO.NS', 'HCLTECH.NS',
-  'HDFCBANK.NS', 'ICICIBANK.NS', 'SBIN.NS', 'KOTAKBANK.NS',
-  'RELIANCE.NS', 'ONGC.NS', 'NTPC.NS',
-  'ITC.NS', 'HINDUNILVR.NS', 'NESTLEIND.NS',
-  'SUNPHARMA.NS', 'DRREDDY.NS', 'CIPLA.NS',
-  '^NSEI', // Nifty 50
-  '^BSESN' // Sensex
-];
-
-// Module-level cache so concurrent visitors share one Yahoo fetch per TTL
-// window (persists for the lifetime of a warm serverless instance).
 const CACHE_TTL_MS = 60_000;
-let cache: { stocks: Record<string, StockData>; timestamp: number } | null = null;
-let inFlight: Promise<Record<string, StockData>> | null = null;
 
-async function fetchStocks(): Promise<Record<string, StockData>> {
-  // Single batched request for all symbols instead of one request each
-  const quotes = await getQuotes(symbols);
-  const stocks: Record<string, StockData> = {};
-
-  quotes.forEach((quote) => {
-    if (quote && typeof quote.regularMarketPrice === 'number') {
-      stocks[quote.symbol] = {
-        regularMarketPrice: quote.regularMarketPrice,
-        regularMarketChangePercent: quote.regularMarketChangePercent ?? 0,
-      };
-    }
-  });
-
-  if (Object.keys(stocks).length === 0) {
-    throw new Error('Yahoo Finance returned no usable quotes');
-  }
-
-  return stocks;
+// Per-symbol cache entry
+interface CacheEntry {
+  data: StockData;
+  ts: number;
 }
 
-export async function GET() {
-  if (cache && Date.now() - cache.timestamp < CACHE_TTL_MS) {
-    return NextResponse.json({
-      stocks: cache.stocks,
-      timestamp: cache.timestamp,
-      source: 'cache',
-    });
+// Module-level per-symbol cache — shared across concurrent requests
+const symbolCache = new Map<string, CacheEntry>();
+// Per-symbol in-flight dedup so overlapping requests share one fetch
+const inFlightMap = new Map<string, Promise<void>>();
+
+async function fetchAndCacheSymbols(stale: string[]): Promise<void> {
+  const quotes = await getQuotes(stale);
+  const now = Date.now();
+  quotes.forEach((quote) => {
+    if (quote && typeof quote.regularMarketPrice === 'number') {
+      symbolCache.set(quote.symbol, {
+        data: {
+          regularMarketPrice: quote.regularMarketPrice,
+          regularMarketChangePercent: quote.regularMarketChangePercent ?? 0,
+        },
+        ts: now,
+      });
+    }
+  });
+}
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const symbolsParam = searchParams.get('symbols');
+
+  let requested: string[];
+  if (symbolsParam && symbolsParam.trim()) {
+    requested = sanitizeSymbols(symbolsParam.split(','));
+    if (requested.length === 0) requested = DEFAULT_SYMBOLS;
+  } else {
+    requested = DEFAULT_SYMBOLS;
   }
 
-  try {
-    // Dedupe concurrent requests into one upstream fetch
-    if (!inFlight) {
-      inFlight = fetchStocks().finally(() => {
-        inFlight = null;
+  const now = Date.now();
+  const stale = requested.filter(s => {
+    const entry = symbolCache.get(s);
+    return !entry || now - entry.ts >= CACHE_TTL_MS;
+  });
+
+  if (stale.length > 0) {
+    // Build a dedup key for this exact stale set
+    const dedupKey = [...stale].sort().join(',');
+    let fetcher = inFlightMap.get(dedupKey);
+    if (!fetcher) {
+      fetcher = fetchAndCacheSymbols(stale).finally(() => {
+        inFlightMap.delete(dedupKey);
       });
+      inFlightMap.set(dedupKey, fetcher);
     }
-    const stocks = await inFlight;
-
-    cache = { stocks, timestamp: Date.now() };
-    return NextResponse.json({
-      stocks,
-      timestamp: cache.timestamp,
-      source: 'api-polling',
-    });
-  } catch (error) {
-    console.error('Real-time API error:', error);
-
-    // Serve stale data over no data if we have it
-    if (cache) {
-      return NextResponse.json({
-        stocks: cache.stocks,
-        timestamp: cache.timestamp,
-        source: 'stale-cache',
-      });
+    try {
+      await fetcher;
+    } catch (error) {
+      console.error('Real-time API fetch error:', error);
+      // Fall through and serve whatever is cached; 502 only if nothing cached at all
     }
+  }
 
+  // Assemble response from cache
+  const stocks: Record<string, StockData> = {};
+  for (const sym of requested) {
+    const entry = symbolCache.get(sym);
+    if (entry) stocks[sym] = entry.data;
+  }
+
+  if (Object.keys(stocks).length === 0) {
     return NextResponse.json(
       { error: 'Failed to fetch real-time data from Yahoo Finance' },
       { status: 502 }
     );
   }
+
+  const oldestTs = requested.reduce((min, sym) => {
+    const entry = symbolCache.get(sym);
+    return entry ? Math.min(min, entry.ts) : min;
+  }, Infinity);
+
+  const hasStale = stale.length > 0 && requested.some(s => {
+    const entry = symbolCache.get(s);
+    return entry && now - entry.ts >= CACHE_TTL_MS;
+  });
+
+  return NextResponse.json({
+    stocks,
+    timestamp: oldestTs === Infinity ? now : oldestTs,
+    source: stale.length === 0 ? 'cache' : hasStale ? 'stale-cache' : 'api-polling',
+  });
 }

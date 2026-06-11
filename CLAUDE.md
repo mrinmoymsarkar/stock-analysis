@@ -31,7 +31,7 @@ The core architectural feature is dual-mode real-time data delivery, handled by 
 
 The hook reports `{ connected, isPolling }`; the header in `src/app/page.tsx` displays this as "WebSocket Connected" / "Polling Mode" / "Disconnected".
 
-The tracked symbol list is **duplicated** in `ws-server.ts` and `src/app/api/stocks/realtime/route.ts` — keep them in sync if changing symbols. Both push only `{ regularMarketPrice, regularMarketChangePercent }` per symbol, wrapped in the `WSMessage` shape (`src/types/index.ts`).
+The default symbol list is single-sourced in `src/lib/watchlist.ts` (`DEFAULT_SYMBOLS`). Both `ws-server.ts` and `src/app/api/stocks/realtime/route.ts` import from there — no more duplication. The realtime route accepts an optional `?symbols=SYM1,SYM2,...` query parameter so each client can poll for its own watchlist; absent/empty falls back to `DEFAULT_SYMBOLS`. Both paths push only `{ regularMarketPrice, regularMarketChangePercent }` per symbol, wrapped in the `WSMessage` shape (`src/types/index.ts`).
 
 ### Data flow
 
@@ -39,7 +39,7 @@ The tracked symbol list is **duplicated** in `ws-server.ts` and `src/app/api/sto
 - API routes (`src/app/api/`):
   - `quote/route.ts` — multiplexes via `?type=quote|historical|summary` (historical takes `&range=`)
   - `search/route.ts` — Yahoo search filtered to Indian equities only (`.NS`/`.BO` suffixes)
-  - `stocks/realtime/route.ts` — batch quotes for the polling fallback. Fetches all symbols in ONE `yahooFinance.quote(string[])` call, behind a module-level 30s TTL cache with in-flight dedup (Yahoo aggressively rate-limits, especially from datacenter IPs). Serves stale cache on upstream failure; returns 502 only when there's no cache at all.
+  - `stocks/realtime/route.ts` — batch quotes for the polling fallback. Accepts optional `?symbols=` query param; defaults to `DEFAULT_SYMBOLS` from `src/lib/watchlist.ts`. Uses a per-symbol `Map` cache (60s TTL) with per-batch in-flight dedup. Fetches only stale/missing symbols in one batched `getQuotes` call. Serves stale entries on upstream failure; returns 502 only when nothing is cached for the requested set.
 - Client hooks fetch from these routes: `useHistoricalData` (chart data via `/api/quote?type=historical`), `useDebounce` (used by `StockSearch`).
 - `src/app/page.tsx` is a single client component holding all page state: a `Record<symbol, StockData>` updated by incoming messages, and an `activeSymbol` that drives the chart. The first symbol to arrive becomes the active chart symbol.
 
