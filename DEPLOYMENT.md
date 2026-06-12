@@ -156,4 +156,44 @@ Your deployment is successful when:
 ✅ Theme toggle functions  
 ✅ Real-time data updates (polling mode)  
 
-The app will show "Polling Mode" in the status indicator, which is the expected behavior on Vercel. 
+The app will show "Polling Mode" in the status indicator, which is the expected behavior on Vercel.
+
+## Authentication Setup (Optional)
+
+Authentication uses Supabase. The app works in guest mode (localStorage watchlist) with no configuration. To enable cloud sync and user accounts:
+
+### Step 1: Create a Supabase project
+
+1. Go to [supabase.com](https://supabase.com) and create a new project.
+2. Once created, go to **Project Settings → API** and copy:
+   - **Project URL** (`NEXT_PUBLIC_SUPABASE_URL`)
+   - **anon public key** (`NEXT_PUBLIC_SUPABASE_ANON_KEY`)
+
+### Step 2: Run the database migration
+
+In the Supabase SQL editor, run the contents of `supabase/migrations/0001_init.sql`. This creates the `watchlists` table with Row Level Security policies.
+
+### Step 3: Configure environment variables
+
+Copy `.env.local.example` to `.env.local` and fill in your Supabase credentials:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```
+
+On Vercel: go to **Project Settings → Environment Variables** and add the same keys.
+
+### Step 4: (Optional) Enable Google OAuth
+
+In the Supabase dashboard go to **Authentication → Providers → Google** and follow the setup guide. Add your Vercel deployment URL to the list of allowed redirect URLs.
+
+### Step 5: (Optional) Enable Cloudflare Turnstile CAPTCHA
+
+In Supabase go to **Authentication → Settings → CAPTCHA protection**, enable Turnstile, and set `NEXT_PUBLIC_TURNSTILE_SITE_KEY` in your environment variables.
+
+### How it works
+
+- When env vars are absent: app runs in guest mode; `/login` shows an "Authentication not configured" notice.
+- When env vars are present: users can sign up/sign in; their watchlist syncs to the `watchlists` table in Supabase.
+- Guest watchlists (localStorage) are seeded to the cloud on first sign-in.

@@ -4,9 +4,11 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { TrendingUp } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { UserMenu } from '@/components/auth/UserMenu';
 
 const NAV_LINKS = [
   { href: '/', label: 'Dashboard' },
+  { href: '/portfolio', label: 'Portfolio' },
   { href: '/news', label: 'News' },
   { href: '/planner', label: 'Planner' },
   { href: '/learn', label: 'Learn' },
@@ -45,7 +47,8 @@ export default function NavHeader() {
           })}
         </nav>
 
-        <div className="shrink-0">
+        <div className="shrink-0 flex items-center gap-2">
+          <UserMenu />
           <ThemeToggle />
         </div>
       </div>
