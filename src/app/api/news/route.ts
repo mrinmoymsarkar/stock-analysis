@@ -12,9 +12,29 @@ interface CacheEntry {
 const cache = new Map<string, CacheEntry>();
 const inFlightMap = new Map<string, Promise<CacheEntry>>();
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// Yahoo's search endpoint returns nothing for long phrase queries, so the
+// general feed aggregates several short queries that do carry news.
+const GENERAL_FEED_KEY = '__general__';
+const GENERAL_QUERIES = ['Nifty 50', 'Sensex', 'NSEI'];
+
+async function fetchGeneralFeed() {
+  const results = await Promise.allSettled(
+    GENERAL_QUERIES.map((q) => getNews(q, 10))
+  );
+  const merged = results
+    .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof getNews>>> => r.status === 'fulfilled')
+    .flatMap((r) => r.value);
+  const byId = new Map(merged.map((item) => [item.uuid, item]));
+  return [...byId.values()].sort(
+    (a, b) =>
+      new Date(b.providerPublishTime ?? 0).getTime() -
+      new Date(a.providerPublishTime ?? 0).getTime()
+  );
+}
+
 async function fetchAndCache(query: string): Promise<CacheEntry> {
-  const data = await getNews(query);
+  const data =
+    query === GENERAL_FEED_KEY ? await fetchGeneralFeed() : await getNews(query);
   const entry: CacheEntry = { data, ts: Date.now() };
   cache.set(query, entry);
   return entry;
@@ -31,7 +51,7 @@ export async function GET(request: Request) {
       .replace(/\.(NS|BO)$/i, '')
       .replace(/^\^/, '');
   } else {
-    query = 'Nifty Sensex Indian stock market';
+    query = GENERAL_FEED_KEY;
   }
 
   const now = Date.now();
