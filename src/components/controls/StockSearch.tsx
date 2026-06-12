@@ -15,6 +15,7 @@ interface SearchResult {
 
 interface StockSearchProps {
   onSymbolSelect: (symbol: string) => void;
+  className?: string;
 }
 
 const QUOTE_TYPE_LABELS: Record<string, string> = {
@@ -23,7 +24,7 @@ const QUOTE_TYPE_LABELS: Record<string, string> = {
   INDEX: 'Index',
 };
 
-export default function StockSearch({ onSymbolSelect }: StockSearchProps) {
+export default function StockSearch({ onSymbolSelect, className }: StockSearchProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -67,7 +68,7 @@ export default function StockSearch({ onSymbolSelect }: StockSearchProps) {
   }, [searchRef]);
 
   return (
-    <div className="relative w-full max-w-xs" ref={searchRef}>
+    <div className={`relative w-full max-w-xs${className ? ` ${className}` : ''}`} ref={searchRef}>
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
         <input
