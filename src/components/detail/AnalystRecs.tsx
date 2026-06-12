@@ -1,5 +1,7 @@
 'use client';
 
+import MetricTooltip from '@/components/ui/MetricTooltip';
+
 interface AnalystRecsProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   summary: any;
@@ -49,12 +51,12 @@ export default function AnalystRecs({ summary, currentPrice }: AnalystRecsProps)
         {targetPrice !== undefined && (
           <div className="flex items-center gap-4 pb-4 border-b border-border">
             <div>
-              <p className="text-xs text-muted-foreground">Analyst Target Price</p>
+              <p className="text-xs text-muted-foreground"><MetricTooltip term="Analyst Target Price">Analyst Target Price</MetricTooltip></p>
               <p className="text-lg font-bold text-foreground">₹{targetPrice.toFixed(2)}</p>
             </div>
             {upside !== undefined && (
               <div>
-                <p className="text-xs text-muted-foreground">Upside/Downside</p>
+                <p className="text-xs text-muted-foreground"><MetricTooltip term="Upside/Downside">Upside/Downside</MetricTooltip></p>
                 <p className={`text-sm font-semibold ${upside >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {upside >= 0 ? '+' : ''}{upside.toFixed(1)}%
                 </p>
@@ -68,7 +70,7 @@ export default function AnalystRecs({ summary, currentPrice }: AnalystRecsProps)
             if (count === undefined || count === 0) return null;
             return (
               <div key={key} className="flex items-center gap-1.5">
-                <span className={`text-xs px-2 py-0.5 rounded font-semibold ${color}`}>{label}</span>
+                <span className={`text-xs px-2 py-0.5 rounded font-semibold ${color}`}><MetricTooltip term={label}>{label}</MetricTooltip></span>
                 <span className="text-sm font-semibold text-foreground">{count}</span>
               </div>
             );

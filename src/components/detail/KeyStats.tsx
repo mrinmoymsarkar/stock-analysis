@@ -1,5 +1,7 @@
 'use client';
 
+import MetricTooltip from '@/components/ui/MetricTooltip';
+
 const inrCompact = new Intl.NumberFormat('en-IN', {
   style: 'currency',
   currency: 'INR',
@@ -74,7 +76,7 @@ export default function KeyStats({ summary, quote }: KeyStatsProps) {
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
         {visible.map(({ label, value }) => (
           <div key={label} className="bg-card border border-border rounded-lg p-3 space-y-1">
-            <p className="text-xs text-muted-foreground">{label}</p>
+            <p className="text-xs text-muted-foreground"><MetricTooltip term={label}>{label}</MetricTooltip></p>
             <p className="text-sm font-semibold text-foreground">{value}</p>
           </div>
         ))}

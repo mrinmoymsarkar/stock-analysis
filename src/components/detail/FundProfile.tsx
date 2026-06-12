@@ -1,5 +1,7 @@
 'use client';
 
+import MetricTooltip from '@/components/ui/MetricTooltip';
+
 interface FundProfileProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   summary: any;
@@ -51,25 +53,25 @@ export default function FundProfile({ summary }: FundProfileProps) {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             {nav !== undefined && (
               <div className="bg-card border border-border rounded-lg p-3 space-y-1">
-                <p className="text-xs text-muted-foreground">NAV</p>
+                <p className="text-xs text-muted-foreground"><MetricTooltip term="NAV">NAV</MetricTooltip></p>
                 <p className="text-sm font-semibold text-foreground">₹{nav.toFixed(4)}</p>
               </div>
             )}
             {fundFamily && (
               <div className="bg-card border border-border rounded-lg p-3 space-y-1">
-                <p className="text-xs text-muted-foreground">Fund Family</p>
+                <p className="text-xs text-muted-foreground"><MetricTooltip term="Fund Family">Fund Family</MetricTooltip></p>
                 <p className="text-sm font-semibold text-foreground">{fundFamily}</p>
               </div>
             )}
             {category && (
               <div className="bg-card border border-border rounded-lg p-3 space-y-1">
-                <p className="text-xs text-muted-foreground">Category</p>
+                <p className="text-xs text-muted-foreground"><MetricTooltip term="Category">Category</MetricTooltip></p>
                 <p className="text-sm font-semibold text-foreground">{category}</p>
               </div>
             )}
             {expenseRatio && (
               <div className="bg-card border border-border rounded-lg p-3 space-y-1">
-                <p className="text-xs text-muted-foreground">Expense Ratio</p>
+                <p className="text-xs text-muted-foreground"><MetricTooltip term="Expense Ratio">Expense Ratio</MetricTooltip></p>
                 <p className="text-sm font-semibold text-foreground">{expenseRatio}</p>
               </div>
             )}
@@ -95,7 +97,7 @@ export default function FundProfile({ summary }: FundProfileProps) {
               const isPositive = n >= 0;
               return (
                 <div key={key} className="bg-card border border-border rounded-lg p-3 space-y-1">
-                  <p className="text-xs text-muted-foreground">{labels[key]}</p>
+                  <p className="text-xs text-muted-foreground"><MetricTooltip term={labels[key]}>{labels[key]}</MetricTooltip></p>
                   <p className={`text-sm font-semibold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
                     {isPositive ? '+' : ''}{formatted}
                   </p>
