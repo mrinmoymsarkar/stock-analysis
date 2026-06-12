@@ -226,4 +226,29 @@ export const GLOSSARY: GlossaryTerm[] = [
     short: 'Short-Term Capital Gains — profit on equity held under 12 months, taxed at 20%.',
     full: 'Short-Term Capital Gains (STCG) on listed equity shares and equity mutual funds arise when the holding period is 12 months or less. Post-July 23, 2024 (Union Budget 2024), STCG is taxed at a flat rate of 20% (increased from 15%), regardless of the investor\'s income tax slab. STCG is reported in ITR-2 or ITR-3 and must be paid even if the overall income is below the basic exemption limit.',
   },
+  {
+    term: 'Invested Value',
+    short: 'Total capital deployed — sum of (quantity × buy price) across all holdings.',
+    full: 'Invested Value (also called Cost Basis) represents the total amount of money you have put into your portfolio across all buying transactions. It is calculated as the sum of (quantity × buy price) for each holding lot. Comparing the invested value with the current market value reveals the absolute profit or loss on your portfolio.',
+  },
+  {
+    term: 'Current Value',
+    short: 'Present market value of your portfolio — sum of (quantity × last traded price).',
+    full: 'Current Value is the real-time market worth of your holdings, calculated as quantity multiplied by the latest traded price for each position. Because stock prices fluctuate continuously during market hours, the current value changes every tick. Comparing current value with invested value gives your unrealised profit or loss.',
+  },
+  {
+    term: 'Day Change',
+    short: 'Change in portfolio value since the previous market close.',
+    full: 'Day Change measures how much the total market value of your holdings has moved since the previous trading session\'s closing prices. It is calculated by multiplying each holding\'s quantity by its daily price change. A positive day change means the portfolio has gained value today; a negative day change means it has lost value relative to the prior close.',
+  },
+  {
+    term: 'Unrealized P&L',
+    short: 'Paper profit or loss on open positions — current value minus invested value.',
+    full: 'Unrealised Profit & Loss (P&L) is the gain or loss on holdings you still own but have not yet sold. It is computed as (current value − invested value). Because the position is still open, the P&L is "unrealised" — it becomes realised (and potentially taxable) only when you sell. Unrealised P&L fluctuates with market prices throughout the trading day.',
+  },
+  {
+    term: 'Allocation',
+    short: 'The percentage of portfolio value held in each stock or asset type.',
+    full: 'Allocation shows how your investment capital is distributed across individual stocks, sectors, or asset types (equity, mutual funds, etc.). It is expressed as a percentage of total portfolio value. A well-diversified portfolio typically avoids excessive concentration in a single stock or sector. Reviewing allocation helps identify over-concentration risk and guides rebalancing decisions.',
+  },
 ];
