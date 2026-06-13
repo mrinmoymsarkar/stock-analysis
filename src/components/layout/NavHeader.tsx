@@ -8,6 +8,7 @@ import { UserMenu } from '@/components/auth/UserMenu';
 
 const NAV_LINKS = [
   { href: '/', label: 'Dashboard' },
+  { href: '/markets', label: 'Markets' },
   { href: '/portfolio', label: 'Portfolio' },
   { href: '/news', label: 'News' },
   { href: '/planner', label: 'Planner' },
