@@ -1,0 +1,16 @@
+{
+  "name": "Stock Analysis India",
+  "short_name": "StockIN",
+  "description": "Track NSE and BSE live stock prices, Nifty 50 and Sensex indices, manage your watchlist, and plan SIP investments.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ]
+}

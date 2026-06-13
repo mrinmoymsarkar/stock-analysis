@@ -3,6 +3,9 @@ import { getQuotes } from '@/services/yahooFinance';
 import { StockData } from '@/types';
 import { DEFAULT_SYMBOLS } from '@/lib/watchlist';
 import { sanitizeSymbols } from '@/lib/symbols';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+
+// SERVERLESS CAVEAT: per-instance memory; still blunts single-instance hammering.
 
 const CACHE_TTL_MS = 60_000;
 
@@ -34,6 +37,15 @@ async function fetchAndCacheSymbols(stale: string[]): Promise<void> {
 }
 
 export async function GET(request: Request) {
+  const ip = getClientIp(request);
+  const rl = checkRateLimit(ip, 'realtime');
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rl.retryAfterSecs) } }
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const symbolsParam = searchParams.get('symbols');
 

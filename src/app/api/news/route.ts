@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getNews } from '@/services/yahooFinance';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+
+// SERVERLESS CAVEAT: per-instance memory; still blunts single-instance hammering.
 
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
@@ -41,8 +44,25 @@ async function fetchAndCache(query: string): Promise<CacheEntry> {
 }
 
 export async function GET(request: Request) {
+  const ip = getClientIp(request);
+  const rl = checkRateLimit(ip, 'news');
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rl.retryAfterSecs) } }
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const symbolParam = searchParams.get('symbol');
+
+  // Bound the symbol param to prevent excessively long inputs
+  if (symbolParam && symbolParam.length > 20) {
+    return NextResponse.json(
+      { error: '"symbol" must be at most 20 characters' },
+      { status: 400 }
+    );
+  }
 
   let query: string;
   if (symbolParam && symbolParam.trim()) {

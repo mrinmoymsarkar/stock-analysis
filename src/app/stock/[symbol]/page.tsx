@@ -10,9 +10,15 @@ interface PageProps {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { symbol: rawSymbol } = await params;
   const symbol = decodeURIComponent(rawSymbol).toUpperCase();
+  const title = `${symbol} | Indian Stock Market Dashboard`;
+  const description = `Price, key statistics, analyst recommendations, and news for ${symbol}.`;
   return {
-    title: `${symbol} | Indian Stock Market Dashboard`,
-    description: `Price, key statistics, analyst recommendations, and news for ${symbol}.`,
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+    },
   };
 }
 

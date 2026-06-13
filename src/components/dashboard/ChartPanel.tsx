@@ -1,11 +1,19 @@
 "use client";
 
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { ExternalLink, ArrowUpRight, ArrowDownRight } from 'lucide-react';
-import PriceChart from '@/components/charts/PriceChart';
 import TimeRangeSelector from '@/components/controls/TimeRangeSelector';
 import AddToWatchlistButton from '@/components/cards/AddToWatchlistButton';
 import { StockData } from '@/types';
+
+// Lazy-load Recharts so it splits out of the initial bundle
+const PriceChart = dynamic(() => import('@/components/charts/PriceChart'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[400px] w-full bg-muted rounded animate-pulse" />
+  ),
+});
 
 const INR = new Intl.NumberFormat('en-IN', {
   minimumFractionDigits: 2,

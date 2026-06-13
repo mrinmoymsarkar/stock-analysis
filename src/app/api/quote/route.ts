@@ -1,7 +1,22 @@
 import { NextResponse } from 'next/server';
 import { getQuote, getHistorical, getSummary } from '@/services/yahooFinance';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+
+// Max symbol length accepted from query params
+const MAX_SYMBOL_LENGTH = 20;
+// Max range string length
+const MAX_RANGE_LENGTH = 10;
 
 export async function GET(request: Request) {
+  const ip = getClientIp(request);
+  const rl = checkRateLimit(ip, 'quote');
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rl.retryAfterSecs) } }
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const symbol = searchParams.get('symbol');
   const type = searchParams.get('type') || 'quote';
@@ -13,10 +28,18 @@ export async function GET(request: Request) {
     );
   }
 
+  if (symbol.length > MAX_SYMBOL_LENGTH) {
+    return NextResponse.json(
+      { error: `"symbol" must be at most ${MAX_SYMBOL_LENGTH} characters` },
+      { status: 400 }
+    );
+  }
+
   try {
     switch (type) {
       case 'historical': {
-        const range = searchParams.get('range') || '1mo';
+        const rawRange = searchParams.get('range') || '1mo';
+        const range = rawRange.slice(0, MAX_RANGE_LENGTH);
         const result = await getHistorical(symbol, range);
         // The chart method returns an object with a 'quotes' array
         return NextResponse.json({ data: result.quotes });
