@@ -101,3 +101,63 @@ User-confirmed: Supabase free tier; Google OAuth + email/password + Cloudflare T
 1. **Yahoo rate limits** — TTL cache mandatory on every new fetch; per-symbol cache shares entries across users. Vercel lambdas don't share module caches — acceptable now; Supabase cache table is the later escape hatch.
 2. **Indian MF data sparseness** — optional-by-default sections, sparse fixture in tests.
 3. **Supabase SSR cookie/middleware footguns** (Phase 5) — get it exactly right before building on it.
+
+---
+
+# POST-LAUNCH ENHANCEMENTS
+
+After Phases 1–6 shipped, a deep-dive audit surfaced further work. Already done (committed):
+**Markets page** (`/markets` — gainers/losers/most-active/trending/52wk, computed from a Nifty-100 quote sweep) and **infra hardening** (per-IP rate limiting on all API routes, SEO metadata + sitemap + robots, error/not-found/loading surfaces, PWA manifest, lazy-loaded Recharts).
+
+## Phase 7 — CSV / file import for holdings (in progress)
+
+The biggest onboarding friction is manual entry. Users hold positions in apps like **INDmoney**, Zerodha, Groww — all of which can export a CSV. A robust *generic* importer beats hardcoding each broker's format.
+
+- `src/lib/csvImport.ts` (pure, tested) — parse via **papaparse** (already installed); heuristic header auto-mapping (detect symbol / quantity / buy(avg) price / buy date columns by fuzzy header names); normalize symbols (uppercase, append `.NS` when a bare NSE ticker is detected); validate each row with the existing `isValidSymbol`/`sanitizeSymbols`; return `{ valid: ParsedRow[], skipped: {row, reason}[] }`. **US tickers (no `.NS`/`.BO`/`^`) are flagged as skipped with reason "US stocks not yet supported" — explicit, never silently dropped.**
+- `src/hooks/useHoldings.ts` — add `addMany(inputs[])`: a single Supabase batch `.insert([...])` (not N round-trips), with one optimistic update and rollback-on-error.
+- `src/components/portfolio/ImportHoldingsDialog.tsx` — file picker (drag/drop), parsed **preview table** with editable column mapping, valid/skipped counts, a downloadable CSV **template**, confirm → `addMany`.
+- `src/app/portfolio/page.tsx` — "Import CSV" button beside "Add Holding"; wire dialog.
+- Tests: `csvImport` (header detection, quoted fields with commas in names, US-row skip, bad rows) with fixture CSV strings; `ImportHoldingsDialog` (preview render, skip display, confirm calls addMany).
+- Disjoint from detail-v2 work; safe to build in parallel.
+
+## Phase 8 — Stock detail page v2 (in progress)
+
+Make "analysis" live up to the name. All from Yahoo modules already available — no new vendor.
+
+- `src/services/yahooFinance.ts` — extend `getDetail` equity modules with `incomeStatementHistory`, `earningsHistory`/`earnings`, `financialData` (ROE/ROA/margins already partially present), `recommendationTrend` (have). Add a `getFinancials` helper if cleaner. Keep stale-on-error.
+- `src/app/api/symbol/[symbol]/route.ts` — include the new modules in the per-quoteType module list (5-min TTL already there).
+- New components under `src/components/detail/`: `FinancialsCard.tsx` (revenue / net-income trend — small Recharts bar), `EarningsCard.tsx` (recent + next earnings date, EPS actual vs estimate), `MarginsCard.tsx` (ROE, ROA, operating/profit margin with `MetricTooltip`). Render conditionally (sparse data safe).
+- `src/app/stock/[symbol]/page.tsx` — slot the new cards in; keep existing layout.
+- Tests: component fixtures (full equity, sparse MF, index) — no crash on missing modules.
+
+## Phase 9 — Portfolio analytics v2a: XIRR + benchmark (next; no DB migration)
+
+All data already present in `holdings` — no schema change needed.
+
+- `src/lib/portfolio.ts` — add `xirr(cashflows)` (Newton-Raphson with bisection fallback; cashflows = each lot's −invested at buyDate, +currentValue today) and `benchmarkComparison(holdings, niftyHistorical)` (what the same cashflows would be worth if invested in `^NSEI` on each buy date → portfolio return vs index return). Heavy unit tests (known-answer XIRR, single lot, all-loss, <1-day edge).
+- `src/components/portfolio/PortfolioSummary.tsx` — add XIRR tile (replaces/augments the approximate CAGR) with `MetricTooltip`.
+- `src/components/portfolio/BenchmarkChart.tsx` — portfolio value vs "if invested in Nifty 50" over time (Recharts).
+- `src/app/api/...` — reuse `getHistorical('^NSEI', ...)`; cache.
+- **Sequential after Phase 7** (both touch `portfolio/page.tsx` + `PortfolioSummary`).
+
+## Phase 10 — Transactions, realized P&L, dividends, tax (needs migration `0002`)
+
+Realized P&L requires a sell/transaction concept the current `holdings`-only schema lacks.
+
+- `supabase/migrations/0002_transactions.sql` — `transactions` table (buy/sell/dividend, qty, price, date, RLS) **or** add `type` + sell columns. **User must run this migration.**
+- `src/lib/portfolio.ts` — FIFO/average-cost realized P&L; dividend income; **LTCG/STCG tax estimate** (India: equity LTCG >1yr @12.5% over ₹1.25L exemption, STCG @20%; MF rules differ) — clearly labelled "indicative, not tax advice."
+- UI: transaction history, realized vs unrealized split, tax summary card.
+
+## Phase 11 — US-stock support (decision pending)
+
+INDmoney commonly holds US equities. Needs: relax `src/app/api/search/route.ts` + `StockSearch` to allow US tickers; store currency on holdings; convert USD→INR via `USDINR=X` (Yahoo) for a unified INR portfolio view (INDmoney shows everything in INR). **Open decision:** unified-INR vs separate US section. Unblocks the importer's currently-skipped US rows.
+
+## Phase 12 — Price alerts (needs email infra)
+
+"Notify me when RELIANCE < ₹2800." Needs `alerts` table + a scheduled check (Vercel Cron) + an email sender (e.g. Resend) — **external setup + an env var the user must provide.** Deferred until the user opts in to an email provider.
+
+## Sequencing
+
+Wave 1 (now, parallel — disjoint files): **Phase 7 (CSV import)** ‖ **Phase 8 (detail v2)**.
+Wave 2 (after 7 merges): **Phase 9 (XIRR + benchmark)**.
+Then, on user decision: Phase 10 (migration), Phase 11 (US stocks), Phase 12 (alerts).
