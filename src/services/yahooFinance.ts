@@ -73,6 +73,32 @@ export async function search(query: string) {
   return yahooFinance.search(query);
 }
 
+/**
+ * Fetches supplemental financial modules for EQUITY symbols in a separate,
+ * independently-failable call so that a Yahoo error here never breaks the
+ * core detail response.
+ *
+ * Modules confirmed to return data for Indian equities (RELIANCE.NS / INFY.NS):
+ *   - earnings       → financialsChart.yearly (revenue & earnings trend) + earningsChart.quarterly (EPS actual/estimate)
+ *   - earningsHistory → history[].epsActual / epsEstimate (quarterly EPS beats)
+ *   - calendarEvents → earnings.earningsDate (next earnings date)
+ *
+ * incomeStatementHistory returns totalRevenue + netIncome per year but Yahoo
+ * warns those figures have been sparse since Nov 2024 — we prefer earnings.financialsChart.yearly
+ * which is identical data in a cleaner shape.
+ */
+async function getFinancials(symbol: string): Promise<Record<string, unknown>> {
+  try {
+    const result = await yahooFinance.quoteSummary(symbol, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      modules: ['earnings', 'earningsHistory', 'calendarEvents'] as any,
+    });
+    return result as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
 export async function getDetail(symbol: string) {
   try {
     const quoteResult = await yahooFinance.quote(symbol);
@@ -98,6 +124,14 @@ export async function getDetail(symbol: string) {
       summary = (await yahooFinance.quoteSummary(symbol, { modules: modules as any })) as Record<string, unknown>;
     } catch {
       // Partial data: return whatever quote we have
+    }
+
+    // For equities, fetch financials separately so a failure here cannot
+    // poison the core summary data already retrieved above.
+    if (quoteType === 'EQUITY') {
+      const financials = await getFinancials(symbol);
+      // Merge only the keys we added — existing keys in summary are untouched.
+      summary = { ...summary, ...financials };
     }
 
     return { quoteType, quote: quoteResult, summary };

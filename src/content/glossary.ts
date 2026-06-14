@@ -251,4 +251,49 @@ export const GLOSSARY: GlossaryTerm[] = [
     short: 'The percentage of portfolio value held in each stock or asset type.',
     full: 'Allocation shows how your investment capital is distributed across individual stocks, sectors, or asset types (equity, mutual funds, etc.). It is expressed as a percentage of total portfolio value. A well-diversified portfolio typically avoids excessive concentration in a single stock or sector. Reviewing allocation helps identify over-concentration risk and guides rebalancing decisions.',
   },
+  {
+    term: 'ROA',
+    short: 'Return on Assets — net profit as a percentage of total assets.',
+    full: 'Return on Assets measures how efficiently a company uses its total asset base to generate profit. It is calculated as (net profit / average total assets) × 100. A higher ROA indicates better asset utilisation. Capital-light businesses like software or FMCG companies typically post higher ROAs than asset-heavy sectors such as steel or telecom.',
+  },
+  {
+    term: 'Operating Margin',
+    short: 'Operating profit as a percentage of revenue — how much each rupee of sales earns before interest and tax.',
+    full: 'Operating margin (also called EBIT margin) shows what fraction of revenue remains after paying operating costs — cost of goods sold, employee expenses, and overheads — but before interest payments and taxes. A consistently high or rising operating margin signals pricing power and cost discipline. In India, EBITDA margin is often used interchangeably in analyst reports.',
+  },
+  {
+    term: 'Profit Margin',
+    short: 'Net profit as a percentage of revenue — the bottom-line efficiency of the business.',
+    full: 'Net profit margin (or net margin) is the percentage of revenue that converts to actual profit after all expenses, interest, and taxes. It is the broadest measure of a company\'s profitability. Compared across quarters or years, widening margins indicate improving cost efficiency or pricing power; narrowing margins may signal cost pressures or competitive headwinds.',
+  },
+  {
+    term: 'EPS Actual',
+    short: 'The earnings per share actually reported by the company for a quarter.',
+    full: 'EPS Actual is the earnings per share figure reported in a company\'s quarterly results. It is compared against the consensus analyst estimate to determine whether the company beat, met, or missed expectations. A positive surprise (actual > estimate) typically causes the stock to rise; a negative surprise (actual < estimate) typically causes it to fall, often sharply.',
+  },
+  {
+    term: 'EPS Estimate',
+    short: 'Analyst consensus forecast for a quarter\'s earnings per share.',
+    full: 'EPS Estimate is the average earnings-per-share forecast compiled from sell-side analyst models ahead of a quarterly earnings release. The estimate reflects what informed market participants expect the company to earn. Indian companies listed on NSE/BSE report quarterly results within 45 days of the quarter end, and market prices often move in the days leading up to results based on updated estimates.',
+  },
+  {
+    term: 'Revenue Trend',
+    short: 'Annual revenue over the past several years — a measure of top-line growth.',
+    full: 'Revenue trend tracks a company\'s total sales (top line) across fiscal years. Consistent revenue growth signals expanding market share or pricing power. For Indian companies, revenue figures in Yahoo Finance are in INR and represent the consolidated financial year ending March 31. Growth should be compared against the sector average and inflation to assess real business expansion.',
+  },
+  {
+    term: 'Net Income Trend',
+    short: 'Annual net profit over past years — measures bottom-line growth.',
+    full: 'Net income trend tracks a company\'s annual profit after all expenses and taxes. Sustained net income growth, especially when it outpaces revenue growth, indicates improving profitability. If net income grows faster than revenue, margins are expanding. If it lags, cost pressures may be building. Indian listed companies publish audited annual figures in their annual reports filed with BSE/NSE.',
+  },
+  {
+    term: 'Next Earnings Date',
+    short: 'The scheduled date for the company\'s next quarterly or annual earnings announcement.',
+    full: 'The next earnings date is when a company is expected to release its quarterly or annual financial results to stock exchanges. In India, NSE/BSE-listed companies must file results within 45 days of each quarter end (60 days for the annual quarter). Earnings releases are often accompanied by analyst calls and can cause large price swings. Dates shown are estimates and may shift.',
+  },
+  {
+    term: 'EPS Surprise',
+    short: 'The percentage by which actual EPS exceeded or missed the analyst estimate.',
+    full: 'EPS Surprise (or earnings surprise) is calculated as ((Actual EPS − Estimated EPS) / |Estimated EPS|) × 100. A large positive surprise often triggers a sharp stock rally; a large miss typically causes a sell-off. Consistently positive surprises can indicate that management is guiding conservatively, while repeated misses may signal deteriorating business conditions or over-optimistic analyst assumptions.',
+  },
 ];

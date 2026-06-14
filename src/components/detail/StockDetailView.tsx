@@ -7,6 +7,9 @@ import StockHeader from '@/components/detail/StockHeader';
 import KeyStats from '@/components/detail/KeyStats';
 import FundProfile from '@/components/detail/FundProfile';
 import AnalystRecs from '@/components/detail/AnalystRecs';
+import FinancialsCard from '@/components/detail/FinancialsCard';
+import EarningsCard from '@/components/detail/EarningsCard';
+import MarginsCard from '@/components/detail/MarginsCard';
 import DetailChart from '@/components/detail/DetailChart';
 import NewsList from '@/components/detail/NewsList';
 
@@ -118,6 +121,18 @@ export default function StockDetailView({ symbol }: StockDetailViewProps) {
 
       {quoteType === 'EQUITY' && summary.recommendationTrend && (
         <AnalystRecs summary={summary} currentPrice={currentPrice} />
+      )}
+
+      {quoteType === 'EQUITY' && (
+        <MarginsCard summary={summary} />
+      )}
+
+      {quoteType === 'EQUITY' && (
+        <FinancialsCard summary={summary} />
+      )}
+
+      {quoteType === 'EQUITY' && (
+        <EarningsCard summary={summary} />
       )}
 
       <DetailChart symbol={symbol} />

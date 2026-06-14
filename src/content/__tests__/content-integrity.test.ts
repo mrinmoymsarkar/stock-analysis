@@ -30,6 +30,19 @@ const METRIC_TOOLTIP_LABELS = [
   'Hold',
   'Sell',
   'Strong Sell',
+  // FinancialsCard
+  'Revenue Trend',
+  'Net Income Trend',
+  // EarningsCard
+  'Next Earnings Date',
+  'EPS Actual',
+  'EPS Estimate',
+  'EPS Surprise',
+  // MarginsCard
+  'Profit Margin',
+  'Operating Margin',
+  'ROE',
+  'ROA',
 ];
 
 describe('Lessons content integrity', () => {
