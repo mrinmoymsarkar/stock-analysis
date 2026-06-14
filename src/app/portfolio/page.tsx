@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Plus, BarChart3 } from 'lucide-react';
+import { Plus, BarChart3, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/components/auth/AuthProvider';
 import useHoldings from '@/hooks/useHoldings';
@@ -11,15 +11,17 @@ import PortfolioSummary from '@/components/portfolio/PortfolioSummary';
 import HoldingsTable from '@/components/portfolio/HoldingsTable';
 import AllocationChart from '@/components/portfolio/AllocationChart';
 import AddHoldingDialog from '@/components/portfolio/AddHoldingDialog';
+import ImportHoldingsDialog from '@/components/portfolio/ImportHoldingsDialog';
 import { portfolioSummary } from '@/lib/portfolio';
 import type { Quote } from '@/lib/portfolio';
 import type { WSMessage, StockData } from '@/types';
 
 export default function PortfolioPage() {
   const { user, loading: authLoading, supabaseEnabled } = useAuth();
-  const { holdings, add, remove, loading: holdingsLoading, enabled } = useHoldings();
+  const { holdings, add, addMany, remove, loading: holdingsLoading, enabled } = useHoldings();
   const [quotes, setQuotes] = useState<Record<string, Quote>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [prefillSymbol, setPrefillSymbol] = useState<string | undefined>();
   const [prefillName, setPrefillName] = useState<string | undefined>();
 
@@ -129,10 +131,16 @@ export default function PortfolioPage() {
               <p className="text-sm text-muted-foreground mt-0.5">Loading holdings…</p>
             )}
           </div>
-          <Button size="sm" onClick={() => openAddDialog()}>
-            <Plus size={16} className="mr-1.5" />
-            Add Holding
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
+              <Upload size={16} className="mr-1.5" />
+              Import CSV
+            </Button>
+            <Button size="sm" onClick={() => openAddDialog()}>
+              <Plus size={16} className="mr-1.5" />
+              Add Holding
+            </Button>
+          </div>
         </div>
 
         {/* Empty state */}
@@ -143,10 +151,16 @@ export default function PortfolioPage() {
             <p className="text-sm text-muted-foreground max-w-sm mx-auto">
               Start tracking your Indian stock portfolio by adding your first holding.
             </p>
-            <Button onClick={() => openAddDialog()}>
-              <Plus size={16} className="mr-1.5" />
-              Add Your First Holding
-            </Button>
+            <div className="flex items-center justify-center gap-3 flex-wrap">
+              <Button onClick={() => openAddDialog()}>
+                <Plus size={16} className="mr-1.5" />
+                Add Your First Holding
+              </Button>
+              <Button variant="outline" onClick={() => setImportOpen(true)}>
+                <Upload size={16} className="mr-1.5" />
+                Import CSV
+              </Button>
+            </div>
           </div>
         )}
 
@@ -174,6 +188,14 @@ export default function PortfolioPage() {
         onSubmit={handleAddSubmit}
         prefillSymbol={prefillSymbol}
         prefillName={prefillName}
+      />
+
+      <ImportHoldingsDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImport={async (rows) => {
+          await addMany(rows);
+        }}
       />
     </div>
   );

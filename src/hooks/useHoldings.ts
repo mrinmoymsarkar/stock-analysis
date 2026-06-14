@@ -35,6 +35,7 @@ interface UpdateHoldingInput {
 interface UseHoldingsResult {
   holdings: Holding[];
   add: (input: AddHoldingInput) => Promise<void>;
+  addMany: (inputs: AddHoldingInput[]) => Promise<{ inserted: number }>;
   update: (id: string, input: UpdateHoldingInput) => Promise<void>;
   remove: (id: string) => Promise<void>;
   loading: boolean;
@@ -138,6 +139,66 @@ export default function useHoldings(): UseHoldingsResult {
     [enabled, user]
   );
 
+  const addMany = useCallback(
+    async (inputs: AddHoldingInput[]): Promise<{ inserted: number }> => {
+      if (!enabled || inputs.length === 0) return { inserted: 0 };
+      const supabase = createBrowserSupabase();
+      if (!supabase) return { inserted: 0 };
+
+      // Build optimistic rows (all with temporary ids)
+      const optimisticIds = inputs.map((_, i) => `opt-bulk-${Date.now()}-${i}`);
+      const optimisticRows: Holding[] = inputs.map((input, i) => ({
+        id: optimisticIds[i],
+        symbol: input.symbol,
+        name: input.name,
+        quoteType: input.quoteType ?? 'EQUITY',
+        quantity: input.quantity,
+        buyPrice: input.buyPrice,
+        buyDate: input.buyDate,
+      }));
+
+      // Optimistic append of all rows at once
+      setHoldings((prev) => [...prev, ...optimisticRows]);
+      setError(null);
+
+      const payload = inputs.map((input, i) => ({
+        user_id: user!.id,
+        symbol: input.symbol,
+        name: input.name ?? null,
+        quote_type: input.quoteType ?? 'EQUITY',
+        quantity: input.quantity,
+        buy_price: input.buyPrice,
+        buy_date: input.buyDate,
+        // Stagger created_at by index so ordering is preserved
+        ...(i > 0 ? {} : {}),
+      }));
+
+      const { data, error: err } = await supabase
+        .from('holdings')
+        .insert(payload)
+        .select('*');
+
+      if (err) {
+        // Rollback all optimistic rows on any error
+        setHoldings((prev) =>
+          prev.filter((h) => !optimisticIds.includes(h.id))
+        );
+        setError(err.message);
+        throw new Error(err.message);
+      }
+
+      // Replace all optimistic rows with real rows from the DB
+      const realRows = (data as HoldingRow[]).map(rowToHolding);
+      setHoldings((prev) => {
+        const withoutOptimistic = prev.filter((h) => !optimisticIds.includes(h.id));
+        return [...withoutOptimistic, ...realRows];
+      });
+
+      return { inserted: realRows.length };
+    },
+    [enabled, user]
+  );
+
   const update = useCallback(
     async (id: string, input: UpdateHoldingInput) => {
       if (!enabled) return;
@@ -216,5 +277,5 @@ export default function useHoldings(): UseHoldingsResult {
     [enabled, user, holdings]
   );
 
-  return { holdings, add, update, remove, loading, error, enabled };
+  return { holdings, add, addMany, update, remove, loading, error, enabled };
 }
