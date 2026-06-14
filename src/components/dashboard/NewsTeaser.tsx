@@ -9,11 +9,13 @@ interface NewsItem {
   title: string;
   publisher: string;
   link: string;
-  providerPublishTime: number;
+  providerPublishTime: Date | number | string;
 }
 
-function relativeTime(ts: number): string {
-  const diffMs = Date.now() - ts * 1000;
+function relativeTime(ts: Date | number | string): string {
+  const ms = ts instanceof Date ? ts.getTime() : typeof ts === 'number' ? ts * 1000 : new Date(ts).getTime();
+  if (isNaN(ms)) return '';
+  const diffMs = Date.now() - ms;
   const diffSecs = Math.floor(diffMs / 1000);
   if (diffSecs < 60) return 'just now';
   const diffMins = Math.floor(diffSecs / 60);

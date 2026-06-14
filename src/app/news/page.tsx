@@ -8,7 +8,7 @@ interface NewsItem {
   title: string;
   publisher: string;
   link: string;
-  providerPublishTime: number;
+  providerPublishTime: Date | number | string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   thumbnail?: any;
 }

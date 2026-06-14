@@ -7,7 +7,7 @@ interface NewsItem {
   title: string;
   publisher: string;
   link: string;
-  providerPublishTime: number;
+  providerPublishTime: Date | number | string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   thumbnail?: any;
 }
@@ -17,8 +17,11 @@ interface NewsListProps {
   loading?: boolean;
 }
 
-function relativeTime(ts: number): string {
-  const diffMs = Date.now() - ts * 1000;
+function relativeTime(ts: Date | number | string): string {
+  // yahoo-finance2 v3 returns Date objects; older shape was Unix seconds (number)
+  const ms = ts instanceof Date ? ts.getTime() : typeof ts === 'number' ? ts * 1000 : new Date(ts).getTime();
+  if (isNaN(ms)) return '';
+  const diffMs = Date.now() - ms;
   const diffSecs = Math.floor(diffMs / 1000);
   if (diffSecs < 60) return 'just now';
   const diffMins = Math.floor(diffSecs / 60);
