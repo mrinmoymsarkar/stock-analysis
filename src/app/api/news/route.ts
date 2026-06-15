@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getNews } from '@/services/yahooFinance';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { fetchRssNews } from '@/services/rssNews';
+import { mergeAndDedupeNews, NewsItem } from '@/lib/newsFeeds';
 
 // SERVERLESS CAVEAT: per-instance memory; still blunts single-instance hammering.
 
@@ -21,18 +23,24 @@ const GENERAL_FEED_KEY = '__general__';
 const GENERAL_QUERIES = ['Nifty 50', 'Sensex', 'NSEI'];
 
 async function fetchGeneralFeed() {
-  const results = await Promise.allSettled(
-    GENERAL_QUERIES.map((q) => getNews(q, 10))
-  );
-  const merged = results
+  const [yahooResults, rssItems] = await Promise.all([
+    Promise.allSettled(GENERAL_QUERIES.map((q) => getNews(q, 10))),
+    fetchRssNews().catch((err) => { console.error('[news] RSS fetch error:', err); return []; }),
+  ]);
+
+  const yahooItems: NewsItem[] = yahooResults
     .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof getNews>>> => r.status === 'fulfilled')
-    .flatMap((r) => r.value);
-  const byId = new Map(merged.map((item) => [item.uuid, item]));
-  return [...byId.values()].sort(
-    (a, b) =>
-      new Date(b.providerPublishTime ?? 0).getTime() -
-      new Date(a.providerPublishTime ?? 0).getTime()
-  );
+    .flatMap((r) => r.value)
+    .map((item) => ({
+      uuid: item.uuid,
+      title: item.title,
+      publisher: item.publisher,
+      link: item.link,
+      providerPublishTime: item.providerPublishTime,
+      thumbnail: item.thumbnail,
+    }));
+
+  return mergeAndDedupeNews([yahooItems, rssItems]);
 }
 
 async function fetchAndCache(query: string): Promise<CacheEntry> {
